@@ -1,0 +1,344 @@
+---
+title: "FInal Exam"
+author: "Prashant Gupta"
+Vid: "V01038654"
+output: html_document
+---
+
+
+```{r message=FALSE, warning=FALSE}
+library(forecast)
+library(ggplot2)
+```
+
+```{r}
+data= read.csv("AustralianTourism.csv")
+```
+
+```{r}
+head(data)
+```
+
+
+```{r}
+data.ts <- ts(data$Victoria, start = c(1998, 1), end = c(2017, 4), freq = 4)
+```
+
+### Using 1998 to 2014 as the training set, keeping 2015, 2016, and 2017 as the validation set.
+
+```{r}
+nValid <- 12
+nTrain <- length(data.ts) - nValid
+
+# partition the data
+train.ts <- window(data.ts, start = c(1998, 1), end = c(1998, nTrain))
+valid.ts <- window(data.ts, start = c(1998, nTrain + 1), 
+                   end = c(1998, nTrain + nValid))
+```
+
+### 1. Fit a regression model to the training data with a linear trend and additive seasonality 
+
+```{r}
+train.lm.trend.season <- tslm(train.ts ~ trend + season)
+summary(train.lm.trend.season)
+train.lm.trend.season.pred <- forecast(train.lm.trend.season, h = nValid)
+```
+
+### Create a plot to compare the fit to the training data. Do not show the validation data.
+
+```{r}
+plot(train.ts, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+lines(train.lm.trend.season.pred$fitted, lwd =2, col = "blue", lty = 3)
+lines(train.lm.trend.season.pred$mean, lwd = 2, col = "blue", lty = 3)
+
+```
+
+### Create a plot to show the forecast and prediction interval.
+
+```{r}
+plot(train.lm.trend.season.pred, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+```
+
+### 2. Fit an ARIMA model
+
+#### What level of differencing do you need?
+```{r}
+ndiffs(train.ts)
+
+
+nsdiffs(train.ts)
+
+```
+### So d = 0, D = 1
+
+### Create an ACF and PACF plot on the differenced data.
+
+```{r}
+
+double.diff.train.ts <- (diff(train.ts, 4))
+tsdisplay(double.diff.train.ts)
+```
+
+#### We can try any of p = 1 or q = 1 and P = 1 or Q = 1
+
+
+### What AR and MA terms do you need?
+```{r}
+ARIMA1.fit <- Arima(train.ts, order = c(1,0,0), seasonal=c(1,1,0))
+summary(ARIMA1.fit)
+```
+
+
+```{r}
+ARIMA2.fit <- Arima(train.ts, order = c(0,0,1), seasonal=c(1,1,0))
+summary(ARIMA2.fit)
+```
+
+```{r}
+ARIMA3.fit <- Arima(train.ts, order = c(1,0,0), seasonal=c(0,1,1))
+summary(ARIMA3.fit)
+```
+
+```{r}
+ARIMA4.fit <- Arima(train.ts, order = c(0,0,1), seasonal=c(0,1,1))
+summary(ARIMA4.fit)
+```
+
+
+### What ARIMA model would you recommend for this data? (If you are unsure then try several)
+
+
+#### p = 1, d = 0, q = 0, P = 0, D = 1, Q = 1
+
+### Fit your recommended ARIMA model
+
+```{r}
+man.ARIMA.fit <- Arima(train.ts, order = c(1,0,0), seasonal=c(0,1,1))
+summary(man.ARIMA.fit)
+```
+
+```{r}
+man.ARIMA.pred <- forecast(man.ARIMA.fit, h = nValid)
+```
+
+### Create a plot to compare the fit to the training data. Do not show the validation data.
+
+```{r}
+plot(train.ts, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+lines(man.ARIMA.pred$fitted, lwd = 2, col = "blue", lty = 3)
+lines(man.ARIMA.pred$mean, lwd = 2, col = "blue", lty = 3)
+
+```
+
+
+
+### Create a plot to show the forecast and prediction interval.
+
+```{r}
+plot(man.ARIMA.pred, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+```
+
+
+
+### 3.Use auto.arima() to fit an ARIMA (p, d, q) (P, D, Q) model to the training data
+
+```{r}
+auto.ARIMA.fit <- auto.arima(train.ts)
+summary(auto.ARIMA.fit) 
+```
+
+```{r}
+auto.ARIMA.pred <- forecast(auto.ARIMA.fit, h = nValid)
+
+```
+
+
+### Create a plot to compare the fit to the training data. Do not show the validation data.
+```{r}
+plot(train.ts, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+lines(auto.ARIMA.pred$fitted, lwd = 2, col = "blue", lty = 3)
+lines(auto.ARIMA.pred$mean, lwd = 2, col = "blue", lty = 3)
+
+```
+
+### Create a plot to show the forecast and prediction interval.
+
+```{r}
+plot(auto.ARIMA.pred, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+```
+
+### 4.Fitting an exponential smoothing model
+
+```{r}
+plot(train.ts, xlab = "Time", ylab = "Victoria", bty = "l")
+```
+
+
+### Looking at the training data:
+### Is there a trend? What form does it take?
+### Is there seasonality? What form does it take?
+
+```{r}
+ggseasonplot(train.ts) + labs(title="Seasonal Plot" )
+```
+
+#### From the above plots we can see that people tend to travel to Victoria mostly around Q1 and Q4.
+
+```{r}
+dec_data <- decompose(data.ts)
+plot(dec_data)
+```
+
+#### We can see that there is additive seasonality with a Upward rising trend.
+#### In other words, the seasonal magnitudes are the same every year and they add to the trend.
+
+
+
+### What ETS() model would you recommend for this data? (If you are unsure then try several)
+
+```{r}
+ETS.model1 <- ets(train.ts, model = "AMA", restrict=FALSE) # Additive error, multiplicative trend, additive season
+ETS.model1
+```
+
+
+
+```{r}
+ETS.model2 <- ets(train.ts, model = "AMN", restrict=FALSE) # Additive error, multiplicative trend, no season
+ETS.model2
+```
+
+```{r}
+ETS.model3 <- ets(train.ts, model = "AAA", restrict=FALSE) # Additive error, additive trend, additive season
+ETS.model3
+```
+
+```{r}
+ETS.model4 <- ets(train.ts, model = "AAN", restrict=FALSE) # Additive error, additive trend, no season
+ETS.model4
+```
+
+```{r}
+ETS.model5 <- ets(train.ts, model = "MMA", restrict=FALSE) # Multiplicative error, multiplicative trend, additive season
+ETS.model5
+```
+
+```{r}
+ETS.model6 <- ets(train.ts, model = "MMN", restrict=FALSE) # Multiplicative error, multiplicative trend, no season
+ETS.model6
+```
+
+```{r}
+ETS.model7 <- ets(train.ts, model = "MAA", restrict=FALSE) # Multiplicative error, additive trend, additive season
+ETS.model7
+```
+
+```{r}
+ETS.model8 <- ets(train.ts, model = "MAN", restrict=FALSE) # Multiplicative error, additive trend, no season
+ETS.model8
+
+```
+
+#### ETS Model 1 (A,M,A) is best with AIC = 1046.151
+
+```{r}
+ETS.model1.pred <- forecast(ETS.model1, h = nValid)
+```
+
+
+### Create a plot to compare the fit to the training data. Do not show the validation data.
+```{r}
+plot(train.ts, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+lines(ETS.model1.pred$fitted, lwd = 2, col = "blue", lty = 3)
+lines(ETS.model1.pred$mean, lwd = 2, col = "blue", lty = 3)
+
+```
+
+### Create a plot to show the forecast and prediction interval.
+
+```{r}
+plot(ETS.model1.pred, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+```
+
+### 5. Fit an ETS model allowing the algorithm to choose the structure for error, trend and seasonality from the training data (10 points)
+
+```{r}
+ETS.alg.model <- ets(train.ts, restrict = FALSE)
+ETS.alg.model
+```
+#### The algorithmic model- ETS(M,N,M) with AIC = 1042.427
+
+### Fit your recommended ets model.
+
+```{r}
+ETS.alg.model.pred <- forecast(ETS.alg.model, h = nValid)
+```
+
+### Create a plot to compare the fit to the training data. Do not show the validation data.
+```{r}
+plot(train.ts, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+lines(ETS.alg.model.pred$fitted, lwd = 2, col = "blue", lty = 3)
+lines(ETS.alg.model.pred$mean, lwd = 2, col = "blue", lty = 3)
+
+```
+
+### Create a plot to show the forecast and prediction interval.
+
+```{r}
+plot(ETS.alg.model.pred, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+```
+
+### 6. Assess the predictive accuracy of your five models in cross-validation (10 points)
+
+```{r}
+accuracy(train.lm.trend.season.pred, valid.ts)
+accuracy(man.ARIMA.pred, valid.ts)
+accuracy(auto.ARIMA.pred, valid.ts)
+accuracy(ETS.model1.pred, valid.ts)
+accuracy(ETS.alg.model.pred, valid.ts)
+
+```
+#### We could say ETS.model1 is best with least MAPE.
+
+### 7.Which model would you recommend to the Australian tourism board for forecasting trips to the Victoria region  (20 points)
+
+#### We would recommend the #4 (ETS.model1) Model to the Australian tourism board for forecasting trips to the Victoria region as it has best accuracy with considerable low error.
+
+
+### Create a plot to compare the fit of your recommended model to the training and validation data.
+
+
+```{r}
+plot(train.ts, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2017), main = "")
+lines(ETS.model1.pred$fitted, lwd = 2, col = "blue", lty = 3)
+lines(ETS.model1.pred$mean, lwd = 2, col = "blue", lty = 3)
+lines(valid.ts, col = "grey20", lty = 3)
+```
+
+### Create a plot to show a 3-year forecast and prediction interval for your chosen model based on the full dataset.
+
+
+```{r}
+final_model=ets(data.ts, model = "AMA", restrict=FALSE)
+final_model.pred <- forecast(final_model, h = 12)
+```
+
+```{r}
+plot(final_model.pred, ylab = "Victoria", xlab = "Time", bty = "l", 
+     xlim = c(1998,2020), main = "")
+lines(final_model.pred$fitted, lwd = 2, col = "blue", lty = 3)
+```
+
+
+
